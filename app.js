@@ -19,7 +19,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-mongoose.connect('mongodb://localhost:27017/NNPTUD-S2');
+let mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/NNPTUD-S2?replicaSet=rs0';
+mongoose.connect(mongoUri);
 mongoose.connection.on('connected', function () {
   console.log("da connect");
 })

@@ -64,7 +64,10 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-userSchema.pre('save', function (next) {
+userSchema.pre('save', function () {
+  if (!this.isModified('password')) {
+    return;
+  }
   let genSalt = bcrypt.genSaltSync(10);
   let newPass = bcrypt.hashSync(this.password, genSalt)
   this.password = newPass;

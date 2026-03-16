@@ -7,6 +7,55 @@ let { checkLogin } = require('../utils/authHandler')
 let crypto = require('crypto')
 let { sendMail } = require('../utils/mailHandler')
 
+async function changePasswordHandler(req, res, next) {
+  try {
+    let oldPassword = req.body.oldpassword || req.body.oldPassword;
+    let newPassword = req.body.newpassword || req.body.newPassword;
+
+    if (!oldPassword || !newPassword) {
+      res.status(400).send({
+        message: 'oldPassword va newPassword khong duoc de trong'
+      })
+      return;
+    }
+
+    let user = await userController.FindByID(req.userId);
+    if (!user) {
+      res.status(404).send({
+        message: 'nguoi dung khong ton tai'
+      })
+      return;
+    }
+
+    let isOldPasswordCorrect = bcrypt.compareSync(oldPassword, user.password);
+    if (!isOldPasswordCorrect) {
+      res.status(400).send({
+        message: 'oldPassword khong dung'
+      })
+      return;
+    }
+
+    let isSamePassword = bcrypt.compareSync(newPassword, user.password);
+    if (isSamePassword) {
+      res.status(400).send({
+        message: 'newPassword phai khac oldPassword'
+      })
+      return;
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.send({
+      message: 'da cap nhat password'
+    })
+  } catch (error) {
+    res.status(400).send({
+      message: error.message
+    })
+  }
+}
+
 
 router.post('/register', async function (req, res, next) {
   let newUser = await userController.CreateAnUser(
@@ -55,43 +104,74 @@ router.post('/logout', checkLogin, function (req, res, next) {
   })
   res.send("logout")
 })
-router.post('/changepassword', checkLogin, async function (req, res, next) {
-  let { oldPassword, newPassword } = req.body;
-  let user = await userController.FindByID(req.userId);
-  if (bcrypt.compareSync(oldPassword, user.password)) {
-    user.password = newPassword;
-  }
-  await user.save();
-  res.send("da cap nhat password")
-})
+router.post('/changepassword', checkLogin, changePasswordHandler)
+router.post('/change-password', checkLogin, changePasswordHandler)
+
 router.post('/forgotpassword', async function (req, res, next) {
-  let email = req.body.email;
-  let user = await userController.FindByEmail(email);
-  if (user) {
+  try {
+    let email = req.body.email;
+    if (!email) {
+      res.status(400).send({
+        message: 'email khong duoc de trong'
+      })
+      return;
+    }
+
+    let user = await userController.FindByEmail(email);
+    if (!user) {
+      res.status(404).send({
+        message: 'email khong ton tai'
+      })
+      return;
+    }
+
     user.forgotPasswordToken = crypto.randomBytes(31).toString('hex');
     user.forgotPasswordTokenExp = new Date(Date.now() + 10 * 60 * 1000);
-    console.log(user.forgotPasswordToken);
     await user.save();
-    res.send("gui mail reset pass")
 
-    await sendMail(user.email, "http://localhost:3000/auth/resetpassword/" + user.forgotPasswordToken)
-    return;
+    let resetPasswordUrl = req.protocol + "://" + req.get('host') + "/auth/resetpassword/" + user.forgotPasswordToken;
+    await sendMail(user.email, resetPasswordUrl)
+
+    res.send({
+      message: 'gui mail reset pass thanh cong'
+    })
+  } catch (error) {
+    res.status(400).send({
+      message: error.message
+    })
   }
-  res.send("email khong ton tai")
 })
+
 router.post('/resetpassword/:token', async function (req, res, next) {
-  let token = req.params.token;
-  let newPassword = req.body.password;
-  let getUser = await userController.FindByToken(token);
-  console.log(getUser);
-  if (getUser) {
+  try {
+    let token = req.params.token;
+    let newPassword = req.body.password || req.body.newPassword;
+    if (!newPassword) {
+      res.status(400).send({
+        message: 'password moi khong duoc de trong'
+      })
+      return;
+    }
+
+    let getUser = await userController.FindByToken(token);
+    if (!getUser) {
+      res.status(400).send({
+        message: 'loi token'
+      })
+      return;
+    }
+
     getUser.password = newPassword;
     getUser.forgotPasswordToken = '';
     getUser.forgotPasswordTokenExp = null;
     await getUser.save()
-    res.send(" da cap nhat")
-  } else {
-    res.send("loi token")
+    res.send({
+      message: 'da cap nhat password'
+    })
+  } catch (error) {
+    res.status(400).send({
+      message: error.message
+    })
   }
 })
 
