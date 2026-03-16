@@ -3,8 +3,7 @@ let reservationItems = mongoose.Schema({
     product: {
         type: mongoose.Types.ObjectId,
         ref: 'product',
-        required: true,
-        unique: true
+        required: true
     },
     quantity: {
         type: Number,
@@ -44,5 +43,7 @@ let reservationSchema = mongoose.Schema({
         type: Date,
         required: true
     }
+}, {
+    timestamps: true
 })
 module.exports = mongoose.model('reservation',reservationSchema)
